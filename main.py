@@ -1,5 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Header, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware   # 👈 ADD THIS
 import cv2 as cv
 import numpy as np
 import os
@@ -10,6 +11,22 @@ from uuid import uuid4
 # ------------------- INIT -------------------
 
 app = FastAPI()
+
+# ------------------- CORS -------------------
+origins = [
+    "http://localhost:5173",   # frontend local dev
+    "http://127.0.0.1:5173",   # sometimes vite runs here
+    # "https://your-frontend-domain.com",  # 👈 later replace with real frontend domain
+    "*"  # allow everything (use only for testing)
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,      # which origins are allowed
+    allow_credentials=True,
+    allow_methods=["*"],        # allow all HTTP methods (POST, GET, etc.)
+    allow_headers=["*"],        # allow all headers
+)
 
 # Create folders if not exist
 os.makedirs("registered_faces", exist_ok=True)
@@ -64,7 +81,8 @@ async def delete_user(user_id: str):
         user_folder = os.path.join("registered_faces", f"user_{user_id}")
 
         if not os.path.exists(user_folder):
-            raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"User {user_id} not found")
 
         shutil.rmtree(user_folder)
 
@@ -91,7 +109,8 @@ async def list_users():
                 if item.startswith("user_"):
                     user_id = item.replace("user_", "")
                     user_folder = os.path.join(registered_faces_dir, item)
-                    image_count = len([f for f in os.listdir(user_folder) if f.endswith('.jpg')])
+                    image_count = len([f for f in os.listdir(
+                        user_folder) if f.endswith('.jpg')])
                     users.append({
                         "user_id": user_id,
                         "image_count": image_count,
@@ -114,7 +133,8 @@ async def get_user_images(user_id: str):
         user_folder = os.path.join("registered_faces", f"user_{user_id}")
 
         if not os.path.exists(user_folder):
-            raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"User {user_id} not found")
 
         images = [f for f in os.listdir(user_folder) if f.endswith('.jpg')]
 
