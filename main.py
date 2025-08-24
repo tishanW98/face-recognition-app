@@ -4,7 +4,7 @@ import cv2 as cv
 import numpy as np
 import os
 import shutil
-from typing import Optional
+from typing import List
 from uuid import uuid4
 
 # ------------------- INIT -------------------
@@ -29,26 +29,29 @@ def read_imagefile(file) -> np.ndarray:
 @app.post("/register_face")
 async def register_face(
         nic: str = Header(..., description="User ID"),
-        image: UploadFile = File(...)
+        images: List[UploadFile] = File(...)
 ):
-    """Register face → save image in user folder"""
+    """
+    Register face(s) → save one or many images in user folder
+    """
     try:
-        # Create folder
+        # Create user folder
         user_folder = os.path.join("registered_faces", f"user_{nic}")
         os.makedirs(user_folder, exist_ok=True)
 
-        # Load and save
-        img = read_imagefile(await image.read())
-        filename = f"{uuid4().hex}.jpg"
-        filepath = os.path.join(user_folder, filename)
-        cv.imwrite(filepath, img)
+        saved_files = []
+        for image in images:
+            img = read_imagefile(await image.read())
+            filename = f"{uuid4().hex}.jpg"
+            filepath = os.path.join(user_folder, filename)
+            cv.imwrite(filepath, img)
+            saved_files.append(filename)
 
         return JSONResponse({
             "status": "success",
             "user_id": nic,
-            "message": f"Image saved as {filename}",
-            "file_path": filepath,
-            "images_count": len(os.listdir(user_folder))
+            "saved_images": saved_files,
+            "total_images_now": len(os.listdir(user_folder))
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -63,7 +66,6 @@ async def delete_user(user_id: str):
         if not os.path.exists(user_folder):
             raise HTTPException(status_code=404, detail=f"User {user_id} not found")
 
-        # Remove the entire user folder
         shutil.rmtree(user_folder)
 
         return JSONResponse({
@@ -134,7 +136,7 @@ async def root():
     return JSONResponse({
         "message": "Face Registration API",
         "endpoints": {
-            "POST /register_face": "Register a face image for a user",
+            "POST /register_face": "Register one or many face images for a user",
             "DELETE /delete_user/{user_id}": "Delete a user and all their images",
             "GET /list_users": "List all registered users",
             "GET /user_images/{user_id}": "Get images for a specific user"
@@ -146,5 +148,4 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000)
